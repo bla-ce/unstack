@@ -19,7 +19,7 @@ To free allocated memory, use the free function:
 ```asm
 
 mov     rdi, rax         ; Address of the memory chunk to free
-call    free            ; Deallocates memory at the given address
+call    free             ; Deallocates memory at the given address
 ```
 
 ## Tests
@@ -52,15 +52,15 @@ _start:
     mov     rbx, rax      ; Store allocated pointer
 
     ; write data to the memory
-    mov    [rbx], 0x1234
+    mov     [rbx], 0x1234
 
     ; free allocated memory
-    mov    rdi, rbx
-    call   free
+    mov     rdi, rbx
+    call    free
 
     ; exit
-    mov    rax, SYS_EXIT
-    mov    rdi, SUCCESS_CODE
+    mov     rax, SYS_EXIT
+    mov     rdi, SUCCESS_CODE
     syscall
 ```
 
