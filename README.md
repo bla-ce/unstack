@@ -8,8 +8,8 @@ To allocate memory, use the malloc function:
 
 ```asm
 
-mov rdi, 64          ; Size in bytes
-call malloc          ; Allocates 64 bytes and returns pointer in RAX
+mov     rdi, 64          ; Size in bytes
+call    malloc           ; Allocates 64 bytes and returns pointer in RAX
 ```
 
 ### Deallocation
@@ -18,22 +18,21 @@ To free allocated memory, use the free function:
 
 ```asm
 
-mov rdi, rax         ; Address of the memory chunk to free
-call free            ; Deallocates memory at the given address
+mov     rdi, rax         ; Address of the memory chunk to free
+call    free            ; Deallocates memory at the given address
 ```
 
 ## Tests
 
 Run tests with 'make test'. Tests in the tests/ directory are executed with strace for system call tracing, exiting with 0 on success or -1 on failure.
 
-```Makefile
-    
+```Makefile  
 make test
 ```
 
 ## Example
 
-A simple example of using the allocator is provided in example.asm:
+A simple example of using the allocator is provided in example.s:
 
 ```asm
 
@@ -48,20 +47,20 @@ section .text
 
 _start:
     ; allocate memory
-    mov rdi, 64
-    call malloc
-    mov rbx, rax      ; Store allocated pointer
+    mov     rdi, 64
+    call    malloc
+    mov     rbx, rax      ; Store allocated pointer
 
     ; write data to the memory
-    mov [rbx], 0x1234
+    mov    [rbx], 0x1234
 
     ; free allocated memory
-    mov rdi, rbx
-    call free
+    mov    rdi, rbx
+    call   free
 
     ; exit
-    mov rax, SYS_EXIT
-    mov rdi, SUCCESS_CODE
+    mov    rax, SYS_EXIT
+    mov    rdi, SUCCESS_CODE
     syscall
 ```
 
