@@ -64,6 +64,49 @@ malloc:
   ; save aligned size onto the stack
   mov   qword [rsp], rax
 
+  ; check if the heap is empty
+  cmp   qword [heap_start], 0
+  je    .request
+
+  mov   rdi, [heap_start]
+
+.loop:
+  ; check if chunk in use
+  cmp   qword [rdi+CHUNK_OFFSET_INUSE], 0 
+  je    .block_not_inuse
+
+.next:
+  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
+
+  ; if next pointer is null, no chunk available
+  cmp   rsi, 0
+  je    .request
+
+  ; go to next pointer
+  mov   rdi, rsi
+
+  jmp   .loop
+
+.block_not_inuse:
+  ; get aligned size to allocate
+  mov   rax, qword [rsp]
+
+  ; compare the chunk size with needed size
+  cmp   qword [rdi+CHUNK_OFFSET_SIZE], rax
+  jl    .next
+
+  ; use this chunk
+  mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
+
+  ; go to data
+  add   rdi, CHUNK_OFFSET_DATA
+
+  ; return the chunk
+  mov   rax, rdi
+  jmp   .return
+
+.request:
+  ; call mmap
   mov   rdi, rax
   call  request_from_os
 
@@ -71,9 +114,8 @@ malloc:
   jl    .error
 
   ; initialize chunk
-  ; store size of the data, needs to sub chunk size
+  ; store size of the data
   mov   rbx, qword [rsp]
-  sub   rbx, CHUNK_SIZE
   mov   qword [rax+CHUNK_OFFSET_SIZE], rbx
   mov   qword [rax+CHUNK_OFFSET_INUSE], 1
   mov   qword [rax+CHUNK_OFFSET_NEXT], 0
@@ -89,14 +131,14 @@ malloc:
   ; look for last node
   mov   rdi, [heap_start]
 
-.loop:
+.find_last_chunk:
   cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
   je    .append_chunk
 
   mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
   mov   rdi, rsi
 
-  jmp   .loop
+  jmp   .find_last_chunk
 
 .append_chunk:
   mov   rsi, [rsp+0x8]

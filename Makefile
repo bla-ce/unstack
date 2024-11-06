@@ -11,9 +11,8 @@ MAIN_OBJ =		main.o
 MAIN_BIN =		main
 TEST_SRCS = 	$(wildcard $(TEST_DIR)/*.s)
 TEST_BINS = 	$(patsubst $(TEST_DIR)/%.s, $(TEST_DIR)/%, $(TEST_SRCS))
-EXAMPLE_SRC = $(EXAMPLE_DIR)/example.s
-EXAMPLE_OBJ =	$(EXAMPLE_DIR)/example.o
-EXAMPLE_BIN =	$(EXAMPLE_DIR)/example
+EXAMPLE_SRCS = 	$(wildcard $(EXAMPLE_DIR)/*.s)
+EXAMPLE_BINS = 	$(patsubst $(EXAMPLE_DIR)/%.s, $(EXAMPLE_DIR)/%, $(EXAMPLE_SRCS))
 
 # Compiler and Linker Flags
 NASM_FLAGS = -f elf64 -g -w+all -I$(INC_DIR)/
@@ -35,10 +34,14 @@ $(TEST_BINS): $(TEST_SRCS) $(INCLUDES)
 		ld -o $$bin $$obj; \
 	done
 
-# Compile example
-$(EXAMPLE_BIN): $(EXAMPLE_SRC) $(INCLUDES)
-	nasm $(NASM_FLAGS) -o $(EXAMPLE_OBJ) $(EXAMPLE_SRC)
-	ld -o $(EXAMPLE_BIN) $(EXAMPLE_OBJ)
+# Compile tests
+$(EXAMPLES_BINS): $(EXAMPLES_SRCS) $(INCLUDES)
+	@for example in $(EXAMPLES_SRCS); do \
+		obj=$$(echo $$example | sed 's/\.s$$/.o/'); \
+		bin=$$(echo $$example | sed 's/\.s$$//'); \
+		nasm $(NASM_FLAGS) -o $$obj $$example; \
+		ld -o $$bin $$obj; \
+	done
 
 # Run tests with strace
 test: $(TEST_BINS)
@@ -54,8 +57,9 @@ test: $(TEST_BINS)
 
 # Clean up
 clean:
-	rm -f $(MAIN_OBJ) $(MAIN_BIN) $(EXAMPLE_OBJ) $(EXAMPLE_BIN)
+	rm -f $(MAIN_OBJ) $(MAIN_BIN)	
 	rm -f $(TEST_DIR)/*.o $(TEST_BINS)
+	rm -f $(EXAMPLE_DIR)/*.o $(EXAMPLE_BINS)
 
 .PHONY: all test clean
 
