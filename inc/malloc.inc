@@ -16,6 +16,63 @@ section .data
   end_chunk:
 
 section .text
+; checks if the chunk can be splitted
+; @param  rdi: chunk
+; @param  rsi: size
+; @return rax: bool
+can_split:
+  xor   rax, rax
+
+  ; needs to remove header size from the chunk
+  mov   rbx, qword [rdi+CHUNK_OFFSET_SIZE]
+  sub   rbx, CHUNK_SIZE
+
+  cmp   rbx, rsi
+  setg  al
+  movzx rax, al
+
+  ret
+
+; splits the chunk of memory to allocate the smallest size
+; @param  rdi: chunk
+; @param  rsi: size
+; @return rax: pointer to new chunk
+_split:
+  sub   rsp, 0x20
+
+  mov   [rsp], rdi
+  mov   qword [rsp+0x8], rsi
+  
+  ; save current next address and chunk size onto the stack
+  mov   rax, qword [rdi+CHUNK_OFFSET_NEXT]
+  mov   [rsp+0x10], rax
+
+  mov   rax, qword [rdi+CHUNK_OFFSET_SIZE]
+  mov   qword [rsp+0x18], rax
+  
+  ; get new next address and size
+  mov   rsi, rdi
+  add   rsi, qword [rsp+0x8]
+  mov   qword [rdi+CHUNK_OFFSET_NEXT], rsi
+
+  mov   rbx, qword [rsp+0x8]
+  mov   qword [rdi+CHUNK_OFFSET_SIZE], rbx
+  mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
+  
+  ; init second chunk
+  mov   rax, qword [rsp+0x10]
+  mov   qword [rsi+CHUNK_OFFSET_INUSE], 0
+  mov   qword [rsi+CHUNK_OFFSET_NEXT], rax
+
+  mov   rbx, qword [rsp+0x18]
+  sub   rbx,  qword [rsp+0x8]
+  mov   qword [rsi+CHUNK_OFFSET_SIZE], rbx
+
+  mov   rax, rdi
+
+  add   rsp, 0x20
+  ret
+
 ; gets memory from the mmap syscall
 ; @param  rdi: page aligned size
 ; @return rax: returns a pointer to the allocated area
@@ -122,7 +179,7 @@ search_chunk:
 ; @param  rdi: size
 ; @return rax: pointer to chunk data
 malloc:
-  sub   rsp, 0x10
+  sub   rsp, 0x18
 
   ; make sure the size if greater than 0
   cmp   rdi, 0
@@ -150,11 +207,8 @@ malloc:
   cmp   rax, 0
   je    .request
 
-  ; go to data
-  add   rax, CHUNK_OFFSET_DATA
-
   ; return the chunk
-  jmp   .return
+  jmp   .found
 
 .request:
   ; call mmap
@@ -195,19 +249,13 @@ malloc:
   mov   rsi, [rsp+0x8]
   mov   qword [rdi+CHUNK_OFFSET_NEXT], rsi
 
-  ; returns pointer to the data
-  add   rax, CHUNK_OFFSET_DATA
-
-  jmp   .return
+  jmp   .found
 
 .init_heap:
   ; initialize the heap
   mov   qword [heap_start], rax 
 
-  ; returns pointer to the data
-  add   rax, CHUNK_OFFSET_DATA
-
-  jmp   .return
+  jmp   .found
 
 .error:
   mov   rax, FAILURE_CODE
@@ -215,8 +263,31 @@ malloc:
 
 .null:
   xor   rax, rax
+  jmp   .return
+
+; once a chunk has been found, find if can be splitted
+.found:
+  ; save chunk pointer onto the stack
+  mov   [rsp+0x10], rax
+
+  mov   rdi, rax 
+  mov   rsi, qword [rsp]
+  call  can_split
+
+  mov   rdi, rax
+  mov   rax, [rsp+0x10]
+  add   rax, CHUNK_OFFSET_DATA
+
+  cmp   rdi, 0
+  je    .return
+
+  mov   rdi, [rsp+0x10]
+  mov   rsi, qword [rsp]
+  call  _split
+
+  add   rax, CHUNK_OFFSET_DATA
 
 .return:
-  add   rsp, 0x10
+  add   rsp, 0x18
   ret
 
