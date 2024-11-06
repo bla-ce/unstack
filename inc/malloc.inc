@@ -42,31 +42,14 @@ _align:
 
   ret
 
-; allocates a chunk of memory of rsi bytes
+; searches a valid previously allocated chunk
 ; @param  rdi: size
-; @return rax: pointer to chunk data
-malloc:
+; @return rax: pointer to chunk, 0 if no valid chunk
+search_chunk:
   sub   rsp, 0x10
 
-  ; make sure the size if greater than 0
-  cmp   rdi, 0
-  je    .null
-  jl    .error 
-
-  ; add chunk_size to the size
-  add   rdi, CHUNK_SIZE
-
-  ; TODO: getpagesize()
-  ; align the size by the page size
-  mov   rsi, PAGE_SIZE
-  call  _align
-
-  ; save aligned size onto the stack
-  mov   qword [rsp], rax
-
-  ; check if the heap is empty
-  cmp   qword [heap_start], 0
-  je    .request
+  mov   qword [rsp], rdi
+  mov   qword [rsp+0x8], 0
 
   mov   rdi, [heap_start]
 
@@ -80,7 +63,7 @@ malloc:
 
   ; if next pointer is null, no chunk available
   cmp   rsi, 0
-  je    .request
+  je    .end_heap
 
   ; go to next pointer
   mov   rdi, rsi
@@ -95,19 +78,87 @@ malloc:
   cmp   qword [rdi+CHUNK_OFFSET_SIZE], rax
   jl    .next
 
+  ; check if already found an available chunk
+  cmp   qword [rsp+0x8], 0
+  je    .init_best_fit
+
+  ; if yes, check if this chunk is smaller
+  mov   rsi, [rsp+0x8]
+  ; get best fit chunk size to compare
+  mov   rbx, qword [rsi+CHUNK_OFFSET_SIZE]
+  cmp   rbx, rax
+  jle   .next
+
+  ; save best fit if smaller
+  mov   [rsp+0x8], rdi
+
+  jmp   .next
+
+.init_best_fit:
+  mov   [rsp+0x8], rdi
+  jmp   .next
+
+.end_heap:
+  cmp   qword [rsp+0x8], 0
+  je    .not_found
+
+  mov   rdi, [rsp+0x8]
+
   ; use this chunk
   mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
 
+  ; return chunk
+  mov   rax, rdi
+  jmp   .return
+
+.not_found:
+  xor   rax, rax
+
+.return:
+  add   rsp, 0x10
+  ret
+
+; allocates a chunk of memory of rsi bytes
+; @param  rdi: size
+; @return rax: pointer to chunk data
+malloc:
+  sub   rsp, 0x10
+
+  ; make sure the size if greater than 0
+  cmp   rdi, 0
+  je    .null
+  jl    .error 
+
+  ; add chunk_size to the size
+  add   rdi, CHUNK_SIZE
+
+  ; align the size by the page size
+  mov   rsi, PAGE_SIZE
+  call  _align
+
+  ; save aligned size onto the stack
+  mov   qword [rsp], rax
+
+  ; check if the heap is empty
+  cmp   qword [heap_start], 0
+  je    .request
+
+  ; search for an available chunk of data
+  mov   rdi, rax
+  call  search_chunk
+
+  cmp   rax, 0
+  je    .request
+
   ; go to data
-  add   rdi, CHUNK_OFFSET_DATA
+  add   rax, CHUNK_OFFSET_DATA
 
   ; return the chunk
-  mov   rax, rdi
   jmp   .return
 
 .request:
   ; call mmap
-  mov   rdi, rax
+  mov   rdi, qword [rsp]
   call  request_from_os
 
   cmp   rax, 0
@@ -131,14 +182,14 @@ malloc:
   ; look for last node
   mov   rdi, [heap_start]
 
-.find_last_chunk:
+.loop:
   cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
   je    .append_chunk
 
   mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
   mov   rdi, rsi
 
-  jmp   .find_last_chunk
+  jmp   .loop
 
 .append_chunk:
   mov   rsi, [rsp+0x8]
