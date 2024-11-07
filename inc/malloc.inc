@@ -7,12 +7,14 @@ section .data
   CHUNK_OFFSET_SIZE   equ 0
   CHUNK_OFFSET_INUSE  equ 0x8
   CHUNK_OFFSET_NEXT   equ 0x10
-  CHUNK_OFFSET_DATA   equ 0x18
+  CHUNK_OFFSET_PREV   equ 0x18
+  CHUNK_OFFSET_DATA   equ 0x20
 
   chunk:
     size  dq 0
     inuse dq 0
     next  dq 0
+    prev  dq 0
   end_chunk:
 
 section .text
@@ -38,17 +40,20 @@ can_split:
 ; @param  rsi: size
 ; @return rax: pointer to new chunk
 _split:
-  sub   rsp, 0x20
+  sub   rsp, 0x28
 
   mov   [rsp], rdi
   mov   qword [rsp+0x8], rsi
   
-  ; save current next address and chunk size onto the stack
+  ; save current next, prev addresses and chunk size onto the stack
   mov   rax, qword [rdi+CHUNK_OFFSET_NEXT]
   mov   [rsp+0x10], rax
 
   mov   rax, qword [rdi+CHUNK_OFFSET_SIZE]
   mov   qword [rsp+0x18], rax
+
+  mov   rax, qword [rdi+CHUNK_OFFSET_PREV]
+  mov   qword [rsp+0x20], rax
   
   ; get new next address and size
   mov   rsi, rdi
@@ -63,14 +68,23 @@ _split:
   mov   rax, qword [rsp+0x10]
   mov   qword [rsi+CHUNK_OFFSET_INUSE], 0
   mov   qword [rsi+CHUNK_OFFSET_NEXT], rax
+  mov   qword [rsi+CHUNK_OFFSET_PREV], rdi
 
   mov   rbx, qword [rsp+0x18]
-  sub   rbx,  qword [rsp+0x8]
+  sub   rbx, qword [rsp+0x8]
   mov   qword [rsi+CHUNK_OFFSET_SIZE], rbx
 
-  mov   rax, rdi
+  ; go to next next chunk to set prev pointer
+  mov   rdi, qword [rsi+CHUNK_OFFSET_NEXT]
+  cmp   rdi, 0
+  je    .return
 
-  add   rsp, 0x20
+  mov   qword [rdi+CHUNK_OFFSET_PREV], rsi
+
+.return:
+  mov   rax, [rsp]
+
+  add   rsp, 0x28
   ret
 
 ; gets memory from the mmap syscall
@@ -145,6 +159,7 @@ search_chunk:
 
   ; if yes, check if this chunk is smaller
   mov   rsi, [rsp+0x8]
+
   ; get best fit chunk size to compare
   mov   rbx, qword [rsi+CHUNK_OFFSET_SIZE]
   cmp   rbx, rax
@@ -260,9 +275,15 @@ malloc:
   mov   rsi, [rsp+0x8]
   mov   qword [rdi+CHUNK_OFFSET_NEXT], rsi
 
+  ; set prev
+  mov   qword [rsi+CHUNK_OFFSET_PREV], rdi
+
   jmp   .found
 
 .init_heap:
+  ; previous set to null
+  mov   qword [rsi+CHUNK_OFFSET_PREV], 0
+
   ; initialize the heap
   mov   rax, [rsp+0x8]
   mov   qword [heap_start], rax 
