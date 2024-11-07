@@ -74,10 +74,14 @@ _split:
   ret
 
 ; gets memory from the mmap syscall
-; @param  rdi: page aligned size
+; @param  rdi: size
 ; @return rax: returns a pointer to the allocated area
 request_from_os:
-  call    mmap
+  mov   rsi, PAGE_SIZE
+  call  _align
+  
+  mov   rdi, rax
+  call  mmap
 
   ret
 
@@ -190,7 +194,7 @@ malloc:
   add   rdi, CHUNK_SIZE
 
   ; align the size by the page size
-  mov   rsi, PAGE_SIZE
+  mov   rsi, 0x8
   call  _align
 
   ; save aligned size onto the stack
@@ -217,16 +221,23 @@ malloc:
 
   cmp   rax, 0
   jl    .error
+  
+  ; save chunk address onto the stack
+  mov   [rsp+0x8], rax
 
   ; initialize chunk
   ; store size of the data
-  mov   rbx, qword [rsp]
-  mov   qword [rax+CHUNK_OFFSET_SIZE], rbx
-  mov   qword [rax+CHUNK_OFFSET_INUSE], 1
-  mov   qword [rax+CHUNK_OFFSET_NEXT], 0
+  mov   rdi, qword [rsp]
 
-  ; save chunk address onto the stack
-  mov   [rsp+0x8], rax
+  ; if request from os, size needs to be page aligned
+  mov   rsi, PAGE_SIZE
+  call  _align 
+
+  mov   rsi, [rsp+0x8]
+
+  mov   qword [rsi+CHUNK_OFFSET_SIZE], rax
+  mov   qword [rsi+CHUNK_OFFSET_INUSE], 1
+  mov   qword [rsi+CHUNK_OFFSET_NEXT], 0
 
   ; check if the heap has been initialized
   cmp   qword [heap_start], 0
@@ -253,6 +264,7 @@ malloc:
 
 .init_heap:
   ; initialize the heap
+  mov   rax, [rsp+0x8]
   mov   qword [heap_start], rax 
 
   jmp   .found
