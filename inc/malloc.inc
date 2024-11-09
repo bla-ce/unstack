@@ -1,5 +1,6 @@
 section .bss
   heap_start  resq 1
+  free_list   resq 1
 
 section .data
   CHUNK_SIZE equ end_chunk-chunk
@@ -131,7 +132,7 @@ search_chunk:
 .loop:
   ; check if chunk in use
   cmp   qword [rdi+CHUNK_OFFSET_INUSE], 0 
-  je    .block_not_inuse
+  je    .chunk_not_inuse
 
 .next:
   mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
@@ -145,7 +146,7 @@ search_chunk:
 
   jmp   .loop
 
-.block_not_inuse:
+.chunk_not_inuse:
   ; get aligned size to allocate
   mov   rax, qword [rsp]
 

@@ -42,7 +42,7 @@ coalesce:
   add   rsp, 0x8
   ret
 
-; coalesces two adjacent blocks
+; coalesces two adjacent chunks
 ; @param  rdi: free chunk
 ; @return rax: chunk
 _coalesce:
@@ -75,7 +75,7 @@ free:
   ; chunk not in use
   mov   qword [rdi+CHUNK_OFFSET_INUSE], 0
 
-  ; check if we can coalesce adjacent block
+  ; check if we can coalesce adjacent chunk
   call  coalesce
 
 .return:
