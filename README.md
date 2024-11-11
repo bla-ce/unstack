@@ -1,5 +1,18 @@
 # Custom Heap Allocator in Netwide Assembly
 
+> [!WARNING]
+> This custom heap allocator implementation is for educational or experimental purposes only.
+> It is NOT suitable yet for production use due to the following limitations:
+> 
+> 1. Limited Error Handling: This implementation may lack robust error-checking mechanisms
+>    and could fail unpredictably with large or unexpected allocations.
+>
+> 2. No Thread Safety: This allocator is not designed to handle concurrent memory allocations
+>    from multiple threads. Use in a multi-threaded environment could lead to data races or crashes.
+>
+> 3. No Memory Protection: this implementation does not
+>    guarantee that freed memory cannot be accessed, which may lead to undefined behavior.
+
 ## Usage
 
 ### Allocation
