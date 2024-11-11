@@ -23,6 +23,9 @@ To allocate memory, use the malloc function:
 
 mov     rdi, 64          ; Size in bytes
 call    malloc           ; Allocates 64 bytes and returns pointer in RAX
+
+cmp     rax, 0
+jl      .error           ; make sure it didn't fail 
 ```
 
 ### Deallocation
@@ -33,6 +36,9 @@ To free allocated memory, use the free function:
 
 mov     rdi, rax         ; Address of the memory chunk to free
 call    free             ; Deallocates memory at the given address
+
+cmp     rax, 0
+jl      .error           ; make sure it didn't fail 
 ```
 
 ### Other functions
@@ -42,6 +48,9 @@ To allocate memory and initialise all bytes to zero, use the calloc function:
 
 mov     rdi, 64 ; Size in bytes
 call    calloc ; Allocate 64 bytes and initialise to 0 
+
+cmp     rax, 0
+jl      .error           ; make sure it didn't fail 
 ```
 
 ## Example
@@ -61,6 +70,10 @@ _start:
     ; allocate memory
     mov     rdi, 64
     call    malloc
+
+    cmp     rax, 0
+    jl      .error
+
     mov     rbx, rax      ; Store allocated pointer
 
     ; write data to the memory
@@ -70,9 +83,18 @@ _start:
     mov     rdi, rbx
     call    free
 
+    cmp     rax, 0
+    jl      .error
+
     ; exit
     mov     rax, SYS_EXIT
     mov     rdi, SUCCESS_CODE
     syscall
+
+.error:
+    mov     rax, SYS_EXIT
+    mov     rdi, FAILURE_CODE
+    syscall
+
 ```
 

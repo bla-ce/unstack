@@ -4,22 +4,28 @@ section .bss
 section .data
   CHUNK_SIZE equ end_chunk-chunk
 
-  CHUNK_OFFSET_SIZE   equ 0
-  CHUNK_OFFSET_INUSE  equ 0x8
-  CHUNK_OFFSET_NEXT   equ 0x10
-  CHUNK_OFFSET_PREV   equ 0x18
-  CHUNK_OFFSET_DATA   equ 0x20
+  CHUNK_OFFSET_MAGIC  equ 0
+  CHUNK_OFFSET_SIZE   equ 0x8
+  CHUNK_OFFSET_INUSE  equ 0x10
+  CHUNK_OFFSET_NEXT   equ 0x18
+  CHUNK_OFFSET_PREV   equ 0x20
+  CHUNK_OFFSET_DATA   equ 0x28
+
+  ; magic value on top of each header making sure the heap is not
+  ; corrupted
+  MAGIC_VAL_HEAP_CORRUPT equ 0xC0FFEE
 
   ; min size is 8 bytes which gives a result of 3 with 'bsr' 
   ; instruction. Add one as it's 0-index
   FIRST_BIN_BSR_INDEX equ 0x4
-  N_BINS  equ 0xA
+  N_BINS              equ 0xA
 
   chunk:
-    size  dq 0
-    inuse dq 0
-    next  dq 0
-    prev  dq 0
+    magic_value dq 0
+    size        dq 0
+    inuse       dq 0
+    next        dq 0
+    prev        dq 0
   end_chunk:
 
   seg_free_list times N_BINS dq 0
@@ -60,12 +66,13 @@ _split:
   mov   rsi, qword [rdi+CHUNK_OFFSET_SIZE]
   mov   qword [rsp+0x10], rsi
 
-  ; update first chunk size
+  ; update first chunk size and add magic value
   mov   rsi, qword [rsp+0x8]
   mov   qword [rdi+CHUNK_OFFSET_SIZE], rsi
 
   ; init second chunk
   add   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
+  mov   qword [rdi+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
   mov   qword [rdi+CHUNK_OFFSET_INUSE], 0
 
   ; get second chunk size
@@ -135,6 +142,10 @@ search_chunk:
   jmp   .loop
 
 .found:
+  ; make sure the data is not corrupted
+  cmp   qword [rdi+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
+  jne   .error
+
   mov   [rsp+0x8], rdi
   ; check if this chunk can be splitted
   mov   rsi, qword [rsp]
@@ -204,6 +215,10 @@ search_chunk:
   add   rsp, 0x10
   ret
 
+.error:
+  mov   rax, FAILURE_CODE
+  jmp   .return
+
 ; allocates a chunk of memory of rsi bytes
 ; @param  rdi: size
 ; @return rax: pointer to chunk data
@@ -231,6 +246,7 @@ malloc:
 
   cmp   rax, 0
   je    .request
+  jl    .error
 
   mov   [rsp+0x8], rax
 
@@ -258,10 +274,11 @@ malloc:
 
   mov   rsi, [rsp+0x8]
 
-  mov   qword [rsi+CHUNK_OFFSET_SIZE], rax
+  mov   qword [rsi+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
+  mov   qword [rsi+CHUNK_OFFSET_SIZE],  rax
   mov   qword [rsi+CHUNK_OFFSET_INUSE], 1
-  mov   qword [rsi+CHUNK_OFFSET_NEXT], 0
-  mov   qword [rsi+CHUNK_OFFSET_PREV], 0
+  mov   qword [rsi+CHUNK_OFFSET_NEXT],  0
+  mov   qword [rsi+CHUNK_OFFSET_PREV],  0
 
   ; check if this chunk can be splitted
   mov   rdi, rsi
@@ -289,9 +306,15 @@ malloc:
 .found:
   ; save chunk pointer onto the stack
   mov   rax, [rsp+0x8]
+
+  ; make sure the heap is not corrupted
+  cmp   qword [rax+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
+  jne   .error
+
   add   rax, CHUNK_OFFSET_DATA
 
 .return:
   add   rsp, 0x18
   ret
+
 

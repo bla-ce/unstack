@@ -26,6 +26,10 @@ add_to_free_list:
 
   mov   [rsp], rdi
 
+  ; make sure the heap is not corrupted
+  cmp   qword [rdi+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
+  jne   .error
+
   mov   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
   call  get_bin
   
@@ -45,17 +49,23 @@ add_to_free_list:
   ; update free_list top - LIFO
   mov   rax, qword [rsp+0x8] 
   mov   [seg_free_list+0x8*rax], rdi
+
+  xor   rax, rax
   
   jmp   .return
   
 .init_free_list:
+  xor   rax, rax
   mov   rdi, [rsp]
   mov   [seg_free_list+0x8*rax], rdi
 
 .return:
-  xor   rax, rax
   add   rsp, 0x10
   ret
+
+.error
+  mov   rax, FAILURE_CODE
+  jmp   .return
 
 ; frees previously allocated memory
 ; @param  rdi: pointer to chunk data
