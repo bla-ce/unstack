@@ -1,64 +1,16 @@
 section .text
-; checks if we can merge with next or prev chunk
-; @param  rdi: chunk
-; @return rax: chunk
-coalesce:
-  sub   rsp, 0x8
+; returns the index of the corresponding bin
+; @param  rdi: size
+; @return rax: bin index
+get_bin:
+  bsr   rax, rdi
 
-  ; save chunk pointer onto the stack
-  mov   [rsp], rdi
+  mov   rbx, N_BINS
 
-  ; check if can coalesce with next chunk
-  xor   rax, rax
-  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
-  cmp   rsi, 0
-  je    .prev
+  cmp   rax, rbx
+  cmovge rax, rbx
 
-  cmp   qword [rsi+CHUNK_OFFSET_INUSE], 0
-  sete  al
-  movzx rax, al
-
-  cmp   rax, 1
-  jne   .prev
-
-  call  _coalesce
-  mov   rdi, rax
-
-  ; check if can coalesce with prev chunk
-.prev:
-  mov   rsi, qword [rdi+CHUNK_OFFSET_PREV]
-  cmp   rsi, 0
-  je    .return
-
-  cmp   qword [rsi+CHUNK_OFFSET_INUSE], 0
-  sete  bl
-  movzx rbx, bl
-
-  mov   rdi, rsi
-  call  _coalesce
-  
-.return:
-  mov   rax, [rsp]
-  add   rsp, 0x8
-  ret
-
-; coalesces two adjacent chunks
-; @param  rdi: free chunk
-; @return rax: chunk
-_coalesce:
-  ; get next next pointer
-  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
-  cmp   rsi, 0
-  je    .return
-
-  mov   rax, qword [rsi+CHUNK_OFFSET_NEXT]
-  mov   rbx, qword [rsi+CHUNK_OFFSET_SIZE]
-
-  mov   qword [rdi+CHUNK_OFFSET_NEXT], rax
-  add   qword [rdi+CHUNK_OFFSET_SIZE], rbx
-
-.return:
-  mov   rax, rdi
+  dec   rax
 
   ret
 
@@ -66,7 +18,7 @@ _coalesce:
 ; @param  rdi: pointer to chunk data
 ; @return rax: void
 free:
-  sub   rsp, 0x8
+  sub   rsp, 0x10
 
   ; go to the beginning of the struct
   sub   rdi, CHUNK_SIZE
@@ -75,12 +27,36 @@ free:
   ; chunk not in use
   mov   qword [rdi+CHUNK_OFFSET_INUSE], 0
 
-  ; check if we can coalesce adjacent chunk
-  call  coalesce
+  ; add to free list
+  mov   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
+  call  get_bin
+
+  ; save bin index
+  mov   qword [rsp+0x8], rax
+
+  lea   rsi, [seg_free_list+0x8*rax]
+  cmp   qword [rsi], 0
+  je    .init_free_list
+
+  mov   rdi, [rsp]
+  mov   rbx, [rsi]
+
+  mov   qword [rdi+CHUNK_OFFSET_NEXT], rbx
+  mov   qword [rbx+CHUNK_OFFSET_PREV], rdi
+
+  ; update free_list top - LIFO
+  mov   rax, qword [rsp+0x8] 
+  mov   [seg_free_list+0x8*rax], rdi
+
+  jmp   .return
+
+.init_free_list:
+  mov   rdi, [rsp]
+  mov   [seg_free_list+0x8*rax], rdi
 
 .return:
   xor   rax, rax
 
-  add   rsp, 0x8
+  add   rsp, 0x10
   ret
 

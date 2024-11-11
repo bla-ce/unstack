@@ -1,6 +1,5 @@
 section .bss
   heap_start  resq 1
-  free_list   resq 1
 
 section .data
   CHUNK_SIZE equ end_chunk-chunk
@@ -11,12 +10,16 @@ section .data
   CHUNK_OFFSET_PREV   equ 0x18
   CHUNK_OFFSET_DATA   equ 0x20
 
+  N_BINS  equ 0xA
+
   chunk:
     size  dq 0
     inuse dq 0
     next  dq 0
     prev  dq 0
   end_chunk:
+
+  seg_free_list times N_BINS dq 0
 
 section .text
 ; checks if the chunk can be splitted
@@ -32,7 +35,7 @@ can_split:
 
   cmp   rbx, rsi
   setg  al
-  movzx rax, al
+  movzx rax, al  
 
   ret
 
@@ -41,51 +44,63 @@ can_split:
 ; @param  rsi: size
 ; @return rax: pointer to new chunk
 _split:
-  sub   rsp, 0x28
+  sub   rsp, 0x20
 
   mov   [rsp], rdi
   mov   qword [rsp+0x8], rsi
-  
-  ; save current next, prev addresses and chunk size onto the stack
-  mov   rax, qword [rdi+CHUNK_OFFSET_NEXT]
-  mov   [rsp+0x10], rax
 
-  mov   rax, qword [rdi+CHUNK_OFFSET_SIZE]
-  mov   qword [rsp+0x18], rax
+  ; rest prev, next addresses
+  mov   qword [rdi+CHUNK_OFFSET_NEXT], 0
+  mov   qword [rdi+CHUNK_OFFSET_PREV], 0
 
-  mov   rax, qword [rdi+CHUNK_OFFSET_PREV]
-  mov   qword [rsp+0x20], rax
-  
-  ; get new next address and size
-  mov   rsi, rdi
-  add   rsi, qword [rsp+0x8]
-  mov   qword [rdi+CHUNK_OFFSET_NEXT], rsi
+  ; save size onto the stack
+  mov   rsi, qword [rdi+CHUNK_OFFSET_SIZE]
+  mov   qword [rsp+0x10], rsi
 
-  mov   rbx, qword [rsp+0x8]
-  mov   qword [rdi+CHUNK_OFFSET_SIZE], rbx
-  mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
-  
+  ; update first chunk size
+  mov   rsi, qword [rsp+0x8]
+  mov   qword [rdi+CHUNK_OFFSET_SIZE], rsi
+
   ; init second chunk
-  mov   rax, qword [rsp+0x10]
-  mov   qword [rsi+CHUNK_OFFSET_INUSE], 0
-  mov   qword [rsi+CHUNK_OFFSET_NEXT], rax
-  mov   qword [rsi+CHUNK_OFFSET_PREV], rdi
+  add   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
+  mov   qword [rdi+CHUNK_OFFSET_INUSE], 0
 
-  mov   rbx, qword [rsp+0x18]
+  ; get second chunk size
+  mov   rbx, qword [rsp+0x10]
   sub   rbx, qword [rsp+0x8]
-  mov   qword [rsi+CHUNK_OFFSET_SIZE], rbx
 
-  ; go to next next chunk to set prev pointer
-  mov   rdi, qword [rsi+CHUNK_OFFSET_NEXT]
-  cmp   rdi, 0
-  je    .return
+  mov   qword [rdi+CHUNK_OFFSET_SIZE], rbx
 
-  mov   qword [rdi+CHUNK_OFFSET_PREV], rsi
+  ; save second chunk pointer onto the stack
+  mov   [rsp+0x18], rdi
+
+  ; add second chunk to free list
+  mov   rdi, rbx
+  call  get_bin
+
+  ; load seg free list
+  lea   rsi, [seg_free_list+0x8*rax]
+  cmp   qword [rsi], 0
+  je    .init_free_list
+  
+  mov   rdi, [rsp+0x18]
+
+  mov   rbx, [rsi]
+  mov   qword [rdi+CHUNK_OFFSET_NEXT], rbx
+  mov   qword [rbx+CHUNK_OFFSET_PREV], rdi
+
+  ; update free_list top
+  mov   [seg_free_list+0x8*rax], rdi
+
+  jmp   .return
+
+.init_free_list:
+  mov   rdi, [rsp+0x18]
+  mov   [seg_free_list+0x8*rax], rdi
 
 .return:
   mov   rax, [rsp]
-
-  add   rsp, 0x28
+  add   rsp, 0x20
   ret
 
 ; gets memory from the mmap syscall
@@ -127,65 +142,73 @@ search_chunk:
   mov   qword [rsp], rdi
   mov   qword [rsp+0x8], 0
 
-  mov   rdi, [heap_start]
-
-.loop:
-  ; check if chunk in use
-  cmp   qword [rdi+CHUNK_OFFSET_INUSE], 0 
-  je    .chunk_not_inuse
-
-.next:
-  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
-
-  ; if next pointer is null, no chunk available
-  cmp   rsi, 0
-  je    .end_heap
-
-  ; go to next pointer
-  mov   rdi, rsi
-
-  jmp   .loop
-
-.chunk_not_inuse:
-  ; get aligned size to allocate
-  mov   rax, qword [rsp]
-
-  ; compare the chunk size with needed size
-  cmp   qword [rdi+CHUNK_OFFSET_SIZE], rax
-  jl    .next
-
-  ; check if already found an available chunk
-  cmp   qword [rsp+0x8], 0
-  je    .init_best_fit
-
-  ; if yes, check if this chunk is smaller
-  mov   rsi, [rsp+0x8]
-
-  ; get best fit chunk size to compare
-  mov   rbx, qword [rsi+CHUNK_OFFSET_SIZE]
-  cmp   rbx, rax
-  jle   .next
-
-  ; save best fit if smaller
-  mov   [rsp+0x8], rdi
-
-  jmp   .next
-
-.init_best_fit:
-  mov   [rsp+0x8], rdi
-  jmp   .next
-
-.end_heap:
-  cmp   qword [rsp+0x8], 0
+  call  get_bin
+  
+  mov   rdi, [seg_free_list+0x8*rax]
+  cmp   rdi, 0
   je    .not_found
 
-  mov   rdi, [rsp+0x8]
+  mov   [rsp+0x8], rdi
 
+.found:
+  ; check if this chunk can be splitted
+  mov   rsi, qword [rsp]
+  call  can_split
+
+  cmp   rax, 0
+  je    .free_chunk
+
+  mov   rdi, [rsp+0x8]
+  mov   rsi, qword [rsp]
+  call  _split
+
+.free_chunk:
   ; use this chunk
   mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
 
+  ; get bin index
+  call  get_bin
+
+  mov   rdi, [rsp+0x8]
+
+  ; remove from free list
+  cmp   qword [rdi+CHUNK_OFFSET_PREV], 0
+  je    .first_chunk
+
+  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
+  je    .last_chunk
+
+  mov   rsi, qword [rdi+CHUNK_OFFSET_PREV]
+  mov   rdi, qword [rdi+CHUNK_OFFSET_NEXT]
+
+  mov   qword [rsi+CHUNK_OFFSET_NEXT], rdi
+  mov   qword [rdi+CHUNK_OFFSET_PREV], rsi
+
+  jmp   .removed
+
+.last_chunk:
+  mov   rsi, qword [rdi+CHUNK_OFFSET_PREV]
+  mov   qword [rsi+CHUNK_OFFSET_NEXT], 0
+
+  jmp   .removed
+
+.first_chunk:
+  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
+  je    .only_chunk
+
+  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
+  mov   qword [rsi+CHUNK_OFFSET_PREV], 0
+
+  mov   qword [seg_free_list+0x8*rax], rsi
+
+  jmp   .removed
+
+.only_chunk:
+  mov   qword [seg_free_list+0x8*rax], 0
+
+.removed:
   ; return chunk
-  mov   rax, rdi
+  mov   rax, [rsp+0x8]
   jmp   .return
 
 .not_found:
@@ -216,16 +239,14 @@ malloc:
   ; save aligned size onto the stack
   mov   qword [rsp], rax
 
-  ; check if the heap is empty
-  cmp   qword [heap_start], 0
-  je    .request
-
   ; search for an available chunk of data
   mov   rdi, rax
   call  search_chunk
 
   cmp   rax, 0
   je    .request
+
+  mov   [rsp+0x8], rax
 
   ; return the chunk
   jmp   .found
@@ -254,41 +275,21 @@ malloc:
   mov   qword [rsi+CHUNK_OFFSET_SIZE], rax
   mov   qword [rsi+CHUNK_OFFSET_INUSE], 1
   mov   qword [rsi+CHUNK_OFFSET_NEXT], 0
-
-  ; check if the heap has been initialized
-  cmp   qword [heap_start], 0
-  je    .init_heap
-
-  ; add chunk to the heap linked list
-  ; look for last node
-  mov   rdi, [heap_start]
-
-.loop:
-  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
-  je    .append_chunk
-
-  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
-  mov   rdi, rsi
-
-  jmp   .loop
-
-.append_chunk:
-  mov   rsi, [rsp+0x8]
-  mov   qword [rdi+CHUNK_OFFSET_NEXT], rsi
-
-  ; set prev
-  mov   qword [rsi+CHUNK_OFFSET_PREV], rdi
-
-  jmp   .found
-
-.init_heap:
-  ; previous set to null
   mov   qword [rsi+CHUNK_OFFSET_PREV], 0
 
-  ; initialize the heap
-  mov   rax, [rsp+0x8]
-  mov   qword [heap_start], rax 
+  ; check if this chunk can be splitted
+  mov   rdi, rsi
+  mov   rsi, qword [rsp]
+  call  can_split
 
+  cmp   rax, 0
+  je    .found
+
+  mov   rdi, [rsp+0x8]
+  mov   rsi, qword [rsp]
+  call  _split
+
+  mov   rax, [rsp+0x8]
   jmp   .found
 
 .error:
@@ -299,26 +300,9 @@ malloc:
   xor   rax, rax
   jmp   .return
 
-; once a chunk has been found, find if can be splitted
 .found:
   ; save chunk pointer onto the stack
-  mov   [rsp+0x10], rax
-
-  mov   rdi, rax 
-  mov   rsi, qword [rsp]
-  call  can_split
-
-  mov   rdi, rax
-  mov   rax, [rsp+0x10]
-  add   rax, CHUNK_OFFSET_DATA
-
-  cmp   rdi, 0
-  je    .return
-
-  mov   rdi, [rsp+0x10]
-  mov   rsi, qword [rsp]
-  call  _split
-
+  mov   rax, [rsp+0x8]
   add   rax, CHUNK_OFFSET_DATA
 
 .return:
