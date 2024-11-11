@@ -10,11 +10,10 @@ section .data
   CHUNK_OFFSET_PREV   equ 0x18
   CHUNK_OFFSET_DATA   equ 0x20
 
-  N_BINS  equ 0xA
-
   ; min size is 8 bytes which gives a result of 3 with 'bsr' 
   ; instruction. add one as it's 0-index
   FIRST_BIN_BSR_INDEX equ 0x4
+  N_BINS  equ 0xA
 
   chunk:
     size  dq 0
@@ -148,13 +147,19 @@ search_chunk:
 
   call  get_bin
   
+.loop:
   mov   rdi, [seg_free_list+0x8*rax]
   cmp   rdi, 0
-  je    .not_found
+  jne   .found
 
-  mov   [rsp+0x8], rdi
+  inc   rax
+  cmp   rax, N_BINS
+  jge   .not_found
+
+  jmp   .loop
 
 .found:
+  mov   [rsp+0x8], rdi
   ; check if this chunk can be splitted
   mov   rsi, qword [rsp]
   call  can_split
