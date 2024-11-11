@@ -55,15 +55,16 @@ add_to_free_list:
   jmp   .return
   
 .init_free_list:
-  xor   rax, rax
   mov   rdi, [rsp]
   mov   [seg_free_list+0x8*rax], rdi
+
+  xor   rax, rax
 
 .return:
   add   rsp, 0x10
   ret
 
-.error
+.error:
   mov   rax, FAILURE_CODE
   jmp   .return
 
