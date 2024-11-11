@@ -11,7 +11,7 @@ section .data
   CHUNK_OFFSET_DATA   equ 0x20
 
   ; min size is 8 bytes which gives a result of 3 with 'bsr' 
-  ; instruction. add one as it's 0-index
+  ; instruction. Add one as it's 0-index
   FIRST_BIN_BSR_INDEX equ 0x4
   N_BINS  equ 0xA
 
@@ -47,7 +47,7 @@ can_split:
 ; @param  rsi: size
 ; @return rax: pointer to new chunk
 _split:
-  sub   rsp, 0x20
+  sub   rsp, 0x18
 
   mov   [rsp], rdi
   mov   qword [rsp+0x8], rsi
@@ -74,36 +74,12 @@ _split:
 
   mov   qword [rdi+CHUNK_OFFSET_SIZE], rbx
 
-  ; save second chunk pointer onto the stack
-  mov   [rsp+0x18], rdi
-
-  ; add second chunk to free list
-  mov   rdi, rbx
-  call  get_bin
-
-  ; load seg free list
-  lea   rsi, [seg_free_list+0x8*rax]
-  cmp   qword [rsi], 0
-  je    .init_free_list
-  
-  mov   rdi, [rsp+0x18]
-
-  mov   rbx, [rsi]
-  mov   qword [rdi+CHUNK_OFFSET_NEXT], rbx
-  mov   qword [rbx+CHUNK_OFFSET_PREV], rdi
-
-  ; update free_list top
-  mov   [seg_free_list+0x8*rax], rdi
-
-  jmp   .return
-
-.init_free_list:
-  mov   rdi, [rsp+0x18]
-  mov   [seg_free_list+0x8*rax], rdi
+  ; add second chunk to the free list
+  call  add_to_free_list
 
 .return:
   mov   rax, [rsp]
-  add   rsp, 0x20
+  add   rsp, 0x18
   ret
 
 ; gets memory from the mmap syscall
