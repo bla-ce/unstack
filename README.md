@@ -22,17 +22,16 @@ mov     rdi, rax         ; Address of the memory chunk to free
 call    free             ; Deallocates memory at the given address
 ```
 
-## Tests
+### Other functions
+To allocate memory and initialise all bytes to zero, use the calloc function:
 
-Run tests with 'make test'. Tests in the tests/ directory are executed with strace for system call tracing, exiting with 0 on success or -1 on failure.
+``asm
 
-```Makefile  
-make test
+mov     rdi, 64 ; Size in bytes
+call    calloc ; Allocate 64 bytes and initialise to 0 
 ```
 
 ## Example
-
-A simple example of using the allocator is provided in example.s:
 
 ```asm
 
