@@ -1,9 +1,17 @@
 section .text
 ; allocates the specified number of bytes and initializes them to zero 
-; @param  rdi: size
+; @param  rdi: number of elements
+; @param  rsi: size of element
 ; @return rax: chunk or null if failed
 calloc:
+  ; get total size
+  xor   rdx, rdx
+  mov   rax, rdi
+  mov   rbx, rsi
+  mul   rbx
+
   ; call malloc
+  mov   rdi, rax
   call  malloc
 
   cmp   rax, 0
