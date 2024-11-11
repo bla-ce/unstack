@@ -12,6 +12,10 @@ section .data
 
   N_BINS  equ 0xA
 
+  ; min size is 8 bytes which gives a result of 3 with 'bsr' 
+  ; instruction. add one as it's 0-index
+  FIRST_BIN_BSR_INDEX equ 0x4
+
   chunk:
     size  dq 0
     inuse dq 0
@@ -167,6 +171,7 @@ search_chunk:
   mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
 
   ; get bin index
+  mov   rdi, qword [rsp]
   call  get_bin
 
   mov   rdi, [rsp+0x8]

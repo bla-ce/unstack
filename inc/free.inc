@@ -5,12 +5,16 @@ section .text
 get_bin:
   bsr   rax, rdi
 
-  mov   rbx, N_BINS
+  ; free list is 0-indexed
+  mov   rbx, N_BINS - 1
+  sub   rax, FIRST_BIN_BSR_INDEX
 
   cmp   rax, rbx
   cmovge rax, rbx
 
-  dec   rax
+  mov   rbx, 0
+  cmp   rax, rbx
+  cmovl rax, rbx
 
   ret
 
