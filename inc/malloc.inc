@@ -311,6 +311,10 @@ malloc:
   cmp   qword [rax+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
   jne   .error
 
+  ; reset next and prev pointers
+  mov   qword [rax+CHUNK_OFFSET_NEXT],  0
+  mov   qword [rax+CHUNK_OFFSET_PREV],  0
+
   add   rax, CHUNK_OFFSET_DATA
 
 .return:
