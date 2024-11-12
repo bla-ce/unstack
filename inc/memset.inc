@@ -1,5 +1,5 @@
 section .text
-; fills a contiguous block of memory with a specific value
+; fills a contiguous chunk of memory with a specific value
 ; @param  rdi: address
 ; @param  rsi: value
 ; @param  rdx: count

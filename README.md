@@ -44,10 +44,11 @@ jl      .error           ; make sure it didn't fail
 ### Other functions
 To allocate memory and initialise all bytes to zero, use the calloc function:
 
-``asm
+```asm
 
-mov     rdi, 64 ; Size in bytes
-call    calloc ; Allocate 64 bytes and initialise to 0 
+mov     rdi, 10 ; number of elements
+mov     rsi, 64 ; size of each element
+call    calloc  ; Allocate 10 elements of 64 bytes and initialise to 0 
 
 cmp     rax, 0
 jl      .error           ; make sure it didn't fail 
