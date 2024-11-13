@@ -7,3 +7,5 @@ test
 *.c
 *.txt
 
+tests/*.o
+tests/*/

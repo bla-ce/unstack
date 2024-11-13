@@ -24,11 +24,16 @@ coalesce:
   add   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
   mov   [rsp+0x8], rdi
 
+  ; remove second chunk from free list
+  call  remove_from_free_list
+
+  mov   rsi, [rsp]
+  mov   rdi, [rsp+0x8]
+
   ; update first chunk size
   mov   rax, qword [rdi+CHUNK_OFFSET_SIZE]
   add   qword [rsi+CHUNK_OFFSET_SIZE], rax
 
-  ; remove second chunk from the free_list
   mov   rax, qword [rdi+CHUNK_OFFSET_NEXT]
   mov   qword [rsi+CHUNK_OFFSET_NEXT], rax
 
@@ -42,6 +47,8 @@ coalesce:
 ; @param  rdi: size
 ; @return rax: bin index
 get_bin:
+  sub   rdi, CHUNK_SIZE
+
   bsr   rax, rdi
 
   ; free list is 0-indexed
@@ -55,6 +62,79 @@ get_bin:
   cmp   rax, rbx
   cmovl rax, rbx
 
+  ret
+
+; removes a chunk of memory from the free list
+; @param  rdi: chunk of memory to remove
+; @return rax: void
+remove_from_free_list:
+  sub   rsp, 0x8
+  
+  mov   [rsp], rdi
+  
+  mov   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
+  call  get_bin
+
+  mov   rdi, qword [seg_free_list+0x8*rax]
+  
+.loop:
+  cmp   rdi, [rsp]
+  je    .remove
+
+  cmp   rdi, 0
+  je    .return
+
+  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
+  mov   rdi, rsi
+
+  jmp   .loop
+
+.remove:
+  mov   rsi, [rsp]
+  cmp   qword [rsi+CHUNK_OFFSET_PREV], 0
+  je    .first_chunk
+
+  cmp   qword [rsi+CHUNK_OFFSET_NEXT], 0
+  je    .last_chunk
+
+  ; update both prev and next
+  mov   rax, qword [rsi+CHUNK_OFFSET_NEXT]
+  mov   rbx, qword [rsi+CHUNK_OFFSET_PREV]
+
+  ; update prev
+  mov   qword [rbx+CHUNK_OFFSET_NEXT], rax
+
+  ; update next
+  mov   qword [rax+CHUNK_OFFSET_PREV], rbx
+
+  jmp   .return
+
+.last_chunk:
+  ; remove prev next pointer
+  mov   rbx, qword [rsi+CHUNK_OFFSET_PREV]
+  mov   qword [rbx+CHUNK_OFFSET_NEXT], 0
+
+  jmp   .return
+
+.first_chunk:
+  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
+  je    .only_chunk
+
+  ; remove from seg free list first
+  mov   qword [seg_free_list+0x8*rax], 0
+
+  ; move next one at the beginning of the free list
+  mov   rbx, qword [rsi+CHUNK_OFFSET_NEXT]
+  mov   qword [rdi], rbx
+
+  jmp   .return
+
+.only_chunk:
+  ; remove from seg free list and return
+  mov   qword [seg_free_list+0x8*rax], 0
+
+.return:
+  add   rsp, 0x8
   ret
 
 ; adds a chunk of memory to the free list

@@ -167,43 +167,8 @@ search_chunk:
   call  get_bin
 
   mov   rdi, [rsp+0x8]
-
-  ; remove from free list
-  cmp   qword [rdi+CHUNK_OFFSET_PREV], 0
-  je    .first_chunk
-
-  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
-  je    .last_chunk
-
-  mov   rsi, qword [rdi+CHUNK_OFFSET_PREV]
-  mov   rdi, qword [rdi+CHUNK_OFFSET_NEXT]
-
-  mov   qword [rsi+CHUNK_OFFSET_NEXT], rdi
-  mov   qword [rdi+CHUNK_OFFSET_PREV], rsi
-
-  jmp   .removed
-
-.last_chunk:
-  mov   rsi, qword [rdi+CHUNK_OFFSET_PREV]
-  mov   qword [rsi+CHUNK_OFFSET_NEXT], 0
-
-  jmp   .removed
-
-.first_chunk:
-  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
-  je    .only_chunk
-
-  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
-  mov   qword [rsi+CHUNK_OFFSET_PREV], 0
-
-  mov   qword [seg_free_list+0x8*rax], rsi
-
-  jmp   .removed
-
-.only_chunk:
-  mov   qword [seg_free_list+0x8*rax], 0
-
-.removed:
+  call  remove_from_free_list 
+  
   ; return chunk
   mov   rax, [rsp+0x8]
   jmp   .return
