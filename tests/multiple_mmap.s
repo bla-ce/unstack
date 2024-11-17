@@ -9,7 +9,7 @@ global _start
 
 section .text
 _start:
-  mov   rdi, 128
+  mov   rdi, 2000
   call  malloc
 
   cmp   rax, 0
@@ -17,20 +17,16 @@ _start:
 
   mov   [p1], rax
 
+  sub   rax, CHUNK_SIZE
+
+  cmp   qword [rax+CHUNK_OFFSET_SIZE], 2000+CHUNK_SIZE
+  jne   .error
+
   mov   rdi, [p1]
   call  free
 
-  mov   rdi, 64
+  mov   rdi, 5000
   call  malloc
-
-  cmp   rax, 0
-  jl    .error
-
-  mov   [p2], rax
-
-  sub   rax, CHUNK_SIZE
-  cmp   qword [rax+CHUNK_OFFSET_SIZE], 64+CHUNK_SIZE
-  jne   .error
 
 .exit:
   mov   rax, SYS_EXIT

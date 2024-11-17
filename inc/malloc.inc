@@ -16,8 +16,8 @@ section .data
   MAGIC_VAL_HEAP_CORRUPT equ 0xC0FFEE
 
   ; min size is 8 bytes which gives a result of 3 with 'bsr' 
-  ; instruction. Add one as it's 0-index
-  FIRST_BIN_BSR_INDEX equ 0x4
+  ; instruction.
+  FIRST_BIN_BSR_INDEX equ 0x3
   N_BINS              equ 0xA
 
   chunk:
@@ -58,11 +58,16 @@ _split:
   mov   [rsp], rdi
   mov   qword [rsp+0x8], rsi
 
-  ; rest prev, next addresses
-  mov   qword [rdi+CHUNK_OFFSET_NEXT], 0
-  mov   qword [rdi+CHUNK_OFFSET_PREV], 0
+  ; check if it's a new chunk
+  cmp   qword [rdi+CHUNK_OFFSET_INUSE], 1
+  je    .new_chunk
 
+  ; remove chunk from free list
+  call  remove_from_free_list
+  
+.new_chunk:
   ; save size onto the stack
+  mov   rdi, [rsp]
   mov   rsi, qword [rdi+CHUNK_OFFSET_SIZE]
   mov   qword [rsp+0x10], rsi
 
@@ -128,18 +133,33 @@ search_chunk:
   mov   qword [rsp], rdi
   mov   qword [rsp+0x8], 0
 
+  ; get bin of data size
+  sub   rdi, CHUNK_SIZE
   call  get_bin
   
 .loop:
   mov   rdi, [seg_free_list+0x8*rax]
   cmp   rdi, 0
-  jne   .found
+  jne   .first_fit
 
+.next_bin:
   inc   rax
   cmp   rax, N_BINS
   jge   .not_found
 
   jmp   .loop
+
+.first_fit:
+  mov   rbx, qword [rsp]
+  cmp   qword [rdi+CHUNK_OFFSET_SIZE], rbx
+  jge   .found
+
+  cmp   qword [rdi+CHUNK_OFFSET_NEXT], 0
+  je    .next_bin
+
+  mov   rsi, qword [rdi+CHUNK_OFFSET_NEXT]
+  mov   rdi, rsi
+  jmp   .first_fit
 
 .found:
   ; make sure the data is not corrupted
@@ -158,19 +178,20 @@ search_chunk:
   mov   rsi, qword [rsp]
   call  _split
 
+  mov   rax, [rsp+0x8]
+
+  jmp   .return
+
 .free_chunk:
   ; use this chunk
-  mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
-
-  ; get bin index
-  mov   rdi, qword [rsp]
-  call  get_bin
+  mov   rdi, [rsp+0x8]
+  call  remove_from_free_list
 
   mov   rdi, [rsp+0x8]
-  call  remove_from_free_list 
+  mov   qword [rdi+CHUNK_OFFSET_INUSE], 1
   
   ; return chunk
-  mov   rax, [rsp+0x8]
+  mov   rax, rdi
   jmp   .return
 
 .not_found:
@@ -198,7 +219,7 @@ malloc:
   ; add chunk_size to the size
   add   rdi, CHUNK_SIZE
 
-  ; align the size by the page size
+  ; align the size
   mov   rsi, 0x8
   call  _align
 
@@ -241,9 +262,9 @@ malloc:
 
   mov   qword [rsi+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
   mov   qword [rsi+CHUNK_OFFSET_SIZE],  rax
-  mov   qword [rsi+CHUNK_OFFSET_INUSE], 1
   mov   qword [rsi+CHUNK_OFFSET_NEXT],  0
   mov   qword [rsi+CHUNK_OFFSET_PREV],  0
+  mov   qword [rsi+CHUNK_OFFSET_INUSE], 1
 
   ; check if this chunk can be splitted
   mov   rdi, rsi
@@ -279,6 +300,7 @@ malloc:
   ; reset next and prev pointers
   mov   qword [rax+CHUNK_OFFSET_NEXT],  0
   mov   qword [rax+CHUNK_OFFSET_PREV],  0
+  mov   qword [rax+CHUNK_OFFSET_INUSE], 1
 
   add   rax, CHUNK_OFFSET_DATA
 

@@ -25,10 +25,13 @@ _start:
 
   mov   [p2], rax
 
-  mov   rdi, [p1]
-  call  free
+  mov   rdi, 32
+  call  malloc
 
   mov   rdi, [p2]
+  call  free
+
+  mov   rdi, [p1]
   call  free
 
   mov   rax, [p1]

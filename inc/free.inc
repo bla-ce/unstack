@@ -34,9 +34,6 @@ coalesce:
   mov   rax, qword [rdi+CHUNK_OFFSET_SIZE]
   add   qword [rsi+CHUNK_OFFSET_SIZE], rax
 
-  mov   rax, qword [rdi+CHUNK_OFFSET_NEXT]
-  mov   qword [rsi+CHUNK_OFFSET_NEXT], rax
-
   ; return first chunk
   mov   rax, [rsp]
 
@@ -47,13 +44,10 @@ coalesce:
 ; @param  rdi: size
 ; @return rax: bin index
 get_bin:
-  sub   rdi, CHUNK_SIZE
-
   bsr   rax, rdi
-
-  ; free list is 0-indexed
-  mov   rbx, N_BINS - 1
   sub   rax, FIRST_BIN_BSR_INDEX
+  
+  mov   rbx, N_BINS
 
   cmp   rax, rbx
   cmovge rax, rbx
@@ -72,7 +66,9 @@ remove_from_free_list:
   
   mov   [rsp], rdi
   
+  ; get bin of data size
   mov   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
+  sub   rdi, CHUNK_SIZE
   call  get_bin
 
   mov   rdi, qword [seg_free_list+0x8*rax]
@@ -149,7 +145,9 @@ add_to_free_list:
   cmp   qword [rdi+CHUNK_OFFSET_MAGIC], MAGIC_VAL_HEAP_CORRUPT
   jne   .error
 
+  ; get bin of data size
   mov   rdi, qword [rdi+CHUNK_OFFSET_SIZE]
+  sub   rdi, CHUNK_SIZE
   call  get_bin
   
   ; save bin index
