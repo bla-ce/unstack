@@ -164,6 +164,11 @@ _start:
   cmp	  rax, 9
   jne   .error
 
+  mov	  rdi, 12000
+  call  get_bin ; Expected: 9
+  cmp	  rax, 9
+  jne   .error
+
   ; If all tests passed, exit with success code
 .exit:
   mov		rax, SYS_EXIT

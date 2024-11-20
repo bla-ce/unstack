@@ -47,7 +47,7 @@ get_bin:
   bsr   rax, rdi
   sub   rax, FIRST_BIN_BSR_INDEX
   
-  mov   rbx, N_BINS
+  mov   rbx, N_BINS-1
 
   cmp   rax, rbx
   cmovge rax, rbx

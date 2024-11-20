@@ -500,7 +500,7 @@ _start:
   jmp   .loop
 
 .end_loop:
-  ; [ /128, /104, /3864, 4040 ]
+  ; [ /128, /104, /3864, /4040 ]
   mov   rdi, 4000
   call  malloc
 
