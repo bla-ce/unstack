@@ -78,7 +78,7 @@ _start:
     mov     rbx, rax      ; Store allocated pointer
 
     ; write data to the memory
-    mov     [rbx], 0x1234
+    mov     qword [rbx], 0x1234
 
     ; free allocated memory
     mov     rdi, rbx
