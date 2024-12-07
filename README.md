@@ -65,6 +65,7 @@ section .text
     %include "utils.inc"
     %include "malloc.inc"
     %include "free.inc"
+    %include "memset.inc"
     %include "mmap.inc"
 
 _start:
