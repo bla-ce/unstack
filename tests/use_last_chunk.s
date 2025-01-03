@@ -9,7 +9,7 @@ global _start
 
 section .text
 _start:
-  mov   rdi, 1024
+  mov   rdi, 12800
   call  malloc
 
   cmp   rax, 0
@@ -17,43 +17,24 @@ _start:
 
   mov   [p1], rax
 
-  mov   rdi, rax
-
-  mov   rax, 0xFE
-  mov   rcx, 1024
+  mov   rsi, rax
+  mov   rax, 12800
+  mov   rcx, 12800
   rep   stosb
 
   mov   rdi, [p1]
   call  free
-  
-  mov   rdi, 12
-  call  malloc
 
-  mov   [p2], rax
-
-  mov   rdi, rax
-  mov   rax, 0x4
-  mov   rcx, 12
-  rep   stosb
-
-  mov   rdi, 64
-  call  malloc
-
-  mov   [p3], rax
-
-  mov   rdi, rax
-  mov   rax, 0x4
-  mov   rcx, 64
-  rep   stosb
-
-  mov   rdi, [p3]
-  call  free
-
-  mov   rdi, 24
+  mov   rdi, 12800
   call  malloc
 
   cmp   rax, 0
   jl    .error
+
+  mov   [p2], rax
+
+  mov   rdi, rax
+  call  free
 
 .exit:
   mov   rax, SYS_EXIT
@@ -68,5 +49,4 @@ _start:
 section .data
   p1    dq 0
   p2    dq 0
-  p3    dq 0
 
