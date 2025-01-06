@@ -17,7 +17,7 @@ _start:
 
   mov   [p1], rax
 
-  mov   rsi, rax
+  mov   rdi, rax
   mov   rax, 12800
   mov   rcx, 12800
   rep   stosb
