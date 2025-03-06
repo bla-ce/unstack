@@ -165,8 +165,8 @@ _start:
   jne   .error
 
   mov	  rdi, 12000
-  call  get_bin ; Expected: 9
-  cmp	  rax, 9
+  call  get_bin ; Expected: 10
+  cmp	  rax, 10
   jne   .error
 
   ; If all tests passed, exit with success code
