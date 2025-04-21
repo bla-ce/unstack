@@ -209,6 +209,11 @@ free:
   ; go to the beginning of the struct
   sub   rdi, CHUNK_SIZE
 
+  ; make sure the chunk needs to be freed
+  mov   rax, qword [rdi+CHUNK_OFFSET_INUSE]
+  cmp   rax, FALSE
+  je    .return
+
   mov   [rsp], rdi
 
   ; check if adjacent chunk is free for coalescing
