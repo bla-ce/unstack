@@ -41,7 +41,7 @@ _start:
   call  free
  
   mov   rax, [p1]
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
   cmp   qword [rax+CHUNK_OFFSET_INUSE], 0
   jne   .error
  
@@ -50,7 +50,7 @@ _start:
   call  free
  
   mov   rax, [p2]
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
   cmp   qword [rax+CHUNK_OFFSET_INUSE], 0
   jne   .error
  
@@ -60,7 +60,7 @@ _start:
 
   mov   [p4], rax
  
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
   cmp   qword [rax+CHUNK_OFFSET_INUSE], 1
   cmp   qword [rax+CHUNK_OFFSET_SIZE], 56
   jne   .error
@@ -75,7 +75,7 @@ _start:
   call  free
  
   mov   rax, [p4]
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
   cmp   qword [rax+CHUNK_OFFSET_INUSE], 0
   jne   .error
  
@@ -91,7 +91,7 @@ _start:
  
   mov   [p6], rax
   
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
   cmp   qword [rax+CHUNK_OFFSET_INUSE], 1
   jne   .error
  

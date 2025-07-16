@@ -28,8 +28,8 @@ _start:
 
   mov   [p2], rax
 
-  sub   rax, CHUNK_SIZE
-  cmp   qword [rax+CHUNK_OFFSET_SIZE], 64+CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
+  cmp   qword [rax+CHUNK_OFFSET_SIZE], 64+CHUNK_METADATA_LEN
   jne   .error
 
 .exit:

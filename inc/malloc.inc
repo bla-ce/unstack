@@ -1,36 +1,58 @@
 section .bss
   heap_start  resq 1
 
+  chunk_metadata_struct:
+    chunk_magic_value   resq 1
+    chunk_size          resq 1
+    chunk_inuse         resq 1
+    chunk_next          resq 1
+    chunk_prev          resq 1
+  chunk_metadata_struct_end:
+
 section .data
-  CHUNK_SIZE equ end_chunk-chunk
+  CHUNK_METADATA_LEN  equ chunk_metadata_struct_end - chunk_metadata_struct
 
   CHUNK_OFFSET_MAGIC  equ 0
-  CHUNK_OFFSET_SIZE   equ 0x8
-  CHUNK_OFFSET_INUSE  equ 0x10
-  CHUNK_OFFSET_NEXT   equ 0x18
-  CHUNK_OFFSET_PREV   equ 0x20
-  CHUNK_OFFSET_DATA   equ 0x28
+  CHUNK_OFFSET_SIZE   equ CHUNK_OFFSET_MAGIC + 0x8
+  CHUNK_OFFSET_INUSE  equ CHUNK_OFFSET_SIZE + 0x8
+  CHUNK_OFFSET_NEXT   equ CHUNK_OFFSET_INUSE + 0x8 
+  CHUNK_OFFSET_PREV   equ CHUNK_OFFSET_NEXT + 0x8
+  CHUNK_OFFSET_DATA   equ CHUNK_OFFSET_PREV + 0x8
 
   ; magic value on top of each header making sure the heap is not
   ; corrupted
-  MAGIC_VAL_HEAP_CORRUPT equ 0xC0FFEE
+  MAGIC_VAL_HEAP_CORRUPT        equ 0xC0FFEE
 
   ; min size is 8 bytes which gives a result of 3 with 'bsr' 
   ; instruction.
   FIRST_BIN_BSR_INDEX equ 0x3
-  N_BINS              equ 0x16
-
-  chunk:
-    magic_value dq 0
-    size        dq 0
-    inuse       dq 0
-    next        dq 0
-    prev        dq 0
-  end_chunk:
+  N_BINS              equ 0xC
 
   seg_free_list times N_BINS dq 0
 
+  mallocd dq 0
+  freed   dq 0
+  mmapd   dq 0
+
 section .text
+; returns the pointer to the header of the chunk
+; @param  rdi: pointer to the chunk
+; @return rax: pointer to the header
+get_chunk_header:
+  cmp   rdi, 0
+  jl    .error
+
+  sub   rdi, CHUNK_METADATA_LEN
+  mov   rax, rdi
+
+  jmp   .return
+
+.error:
+  mov   rax, FAILURE_CODE
+
+.return:
+  ret
+
 ; checks if the chunk can be splitted
 ; @param  rdi: chunk
 ; @param  rsi: size
@@ -40,7 +62,7 @@ can_split:
 
   ; needs to remove header size from the chunk
   mov   rbx, qword [rdi+CHUNK_OFFSET_SIZE]
-  sub   rbx, CHUNK_SIZE
+  sub   rbx, CHUNK_METADATA_LEN
 
   cmp   rbx, rsi
   setg  al
@@ -104,6 +126,8 @@ _split:
 request_from_os:
   mov   rsi, PAGE_SIZE
   call  _align
+
+  add   qword [mmapd], rax
   
   mov   rdi, rax
   call  mmap
@@ -137,8 +161,12 @@ search_chunk:
   mov   qword [rsp], rdi
   mov   qword [rsp+0x8], 0
 
+  call  get_chunk_header
+  cmp   rax, 0
+  jl    .error
+
   ; get bin of data size
-  sub   rdi, CHUNK_SIZE
+  mov   rdi, rax
   call  get_bin
   
 .loop:
@@ -221,7 +249,7 @@ malloc:
   jl    .error 
 
   ; add chunk_size to the size
-  add   rdi, CHUNK_SIZE
+  add   rdi, CHUNK_METADATA_LEN
 
   ; align the size
   mov   rsi, 0x8
@@ -231,7 +259,7 @@ malloc:
   mov   qword [rsp], rax
 
   ; search for an available chunk of data
-  mov   rdi, rax
+  mov   rdi, qword [rsp]
   call  search_chunk
 
   cmp   rax, 0
@@ -273,13 +301,13 @@ malloc:
   cmp   qword [heap_start], 0
   jne   .heap_is_init
 
-  mov   rdi, rsi
+  mov   rdi, [rsp+0x8]
   add   rdi, rax
   mov   qword [heap_start], rdi
 
 .heap_is_init:
   ; check if this chunk can be splitted
-  mov   rdi, rsi
+  mov   rdi, [rsp+0x8]
   mov   rsi, qword [rsp]
   call  can_split
 
@@ -313,6 +341,9 @@ malloc:
   mov   qword [rax+CHUNK_OFFSET_NEXT],  0
   mov   qword [rax+CHUNK_OFFSET_PREV],  0
   mov   qword [rax+CHUNK_OFFSET_INUSE], 1
+
+  mov   rbx, qword [rax+CHUNK_OFFSET_SIZE]
+  add   qword [mallocd], rbx
 
   add   rax, CHUNK_OFFSET_DATA
 

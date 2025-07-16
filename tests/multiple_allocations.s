@@ -17,9 +17,9 @@ _start:
 
   mov   [p1], rax
 
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
 
-  cmp   qword [rax+CHUNK_OFFSET_SIZE], 16+CHUNK_SIZE
+  cmp   qword [rax+CHUNK_OFFSET_SIZE], 16+CHUNK_METADATA_LEN
   jne   .error
 
   mov   rdi, 32
@@ -34,9 +34,9 @@ _start:
   cmp   rax, rbx
   je    .error
 
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
 
-  cmp   qword [rax+CHUNK_OFFSET_SIZE], 32+CHUNK_SIZE
+  cmp   qword [rax+CHUNK_OFFSET_SIZE], 32+CHUNK_METADATA_LEN
   jne   .error
 
   mov   rdi, 64
@@ -52,9 +52,9 @@ _start:
   cmp   rax, rbx
   je    .error
 
-  sub   rax, CHUNK_SIZE
+  sub   rax, CHUNK_METADATA_LEN
 
-  cmp   qword [rax+CHUNK_OFFSET_SIZE], 64+CHUNK_SIZE
+  cmp   qword [rax+CHUNK_OFFSET_SIZE], 64+CHUNK_METADATA_LEN
   jne   .error
 
 .exit:
